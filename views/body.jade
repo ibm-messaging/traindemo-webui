@@ -1,0 +1,357 @@
+// Copyright (c) 2014 IBM Corporation and other Contributors.
+//
+// All rights reserved. This program and the accompanying materials
+// are made available under the terms of the Eclipse Public License v1.0
+// which accompanies this distribution, and is available at
+// http://www.eclipse.org/legal/epl-v10.html 
+//
+
+body(class="claro")
+  div(id="mapDiv")
+  script(type='text/javascript', src='/js/mqttws31.js').
+  script.
+    // The first part of this script is MQTT-related.
+    // The second part is specific to esri
+    var mqttClient = null;
+    var startMessage = new Messaging.Message("Start");
+    var stopMessage = new Messaging.Message("Stop");
+
+    // The following function has to be global so it can be referenced in
+    // the Popup content.
+    function publishStartCommand(trainId) {
+      console.log("In publishStartCommand(" + trainId + ")");
+      var topic = "TrainDemo/train/" + trainId + "/command";
+      startMessage.destinationName = topic;
+      mqttClient.send(startMessage);
+    }
+
+    // The following function has to be global so it can be referenced in
+    // the Popup content.
+    function publishStopCommand(trainId) {
+      console.log("In publishStopCommand(" + trainId + ")");
+      var topic = "TrainDemo/train/" + trainId + "/command";
+      stopMessage.destinationName = topic;
+      mqttClient.send(stopMessage);
+    }
+
+    function onMessageDelivered() {
+    }
+
+    function onConnectFailure(reason) {
+        console.log("In onConnectFailure()");
+        if (reason.errorCode !== 0) {
+            console.log("error code: " + reason.errorCode);
+            console.log("error message: " + reason.errorMessage);
+        }
+    }
+
+    function onConnectionLost(responseObject) {
+        console.log("In onConnectionLost()");
+        if (responseObject.errorCode !== 0) {
+            console.log("error code: " + responseObject.errorCode);
+            console.log("error message: " + responseObject.errorMessage);
+        }
+    }
+
+      function onConnectSuccess() {
+          console.log("In onConnectSuccess()");
+          var subscribeOptions = {};
+          mqttClient.subscribe("TrainDemo/train/+/telemetry", subscribeOptions);
+      }
+
+    // This is the start of the esri-specific code
+    require(["esri/map",
+             "esri/symbols/PictureMarkerSymbol",
+             "esri/dijit/Popup",
+             "dojo/domReady!"],
+             function(Map, PictureMarkerSymbol, Popup) {
+      // Create a popup to use with the Map
+      var popupOptions = {};
+      var popupSrcNodeRef = dojo.create("div");
+      var popup = new Popup(popupOptions, popupSrcNodeRef);
+      var basemap = '#{BaseMap}';
+      console.log("About to create Map with basemap " + basemap);
+      map = new Map("mapDiv", {
+        center: [ #{mapCenterLon}, #{mapCenterLat}],
+        zoom: #{mapZoom},
+        infoWindow: popup,
+        basemap: basemap
+      });
+
+      map.on("load", mapLoaded);
+
+      // Map from trainId to Graphic
+      var trainToGraphicMap = {};
+
+      var modelTrainPMS = null;
+      var movingTrainPMS = null;
+      var stationaryTrainPMS = null;
+      var stoppedTrainPMS = null;
+
+      function createGraphic(trainId, payload) {
+        var graphic = null;
+        var pms = null;
+        var point = new esri.geometry.Point(payload.location.longitude,
+                                            payload.location.latitude,
+                                            new esri.SpatialReference({
+                                              wkid : 4326
+                                            }));
+        var graphicAttributes = {
+          trainId : trainId,
+          longitude : payload.location.longitude,
+          latitude : payload.location.latitude,
+          speed : payload.speed,
+          temperature : payload.temperature,
+          weight : payload.weight,
+          light : payload.light,
+          distance : payload.distance,
+          status : payload.status
+        };
+
+        if (trainId == 0) {
+           pms = modelTrainPMS;
+        } else if (payload.status == 'at_start_station' ||
+                   payload.status == 'at_end_station') {
+           pms = stationaryTrainPMS;
+        } else if (payload.status == 'moving') {
+           pms = movingTrainPMS;
+        } else if (payload.status == 'stopped') {
+           pms = stoppedTrainPMS;
+        } else {
+          alert("Unexpected status");
+        }
+        // Create graphic without infoTemplate as we register an onclick
+        // handler and create our own Popup
+        graphic = new esri.Graphic(point, pms, graphicAttributes);
+        return graphic;
+      }
+
+      function changeStatus(trainId, status) {
+        var pms = null;
+        var graphic = trainToGraphicMap[trainId];
+        if (trainId == 0) {
+          console.log("Changing status of model train");
+        }
+        if (trainId > 0) {
+          if (status == 'at_start_station' ||
+              status == 'at_end_station') {
+            pms = stationaryTrainPMS;
+          } else if (status == 'moving') {
+            pms = movingTrainPMS;
+          } else if (status == 'stopped') {
+            pms = stoppedTrainPMS;
+          } else {
+            alert("Unexpected status");
+          }
+          graphic.setSymbol(pms);
+        }
+        graphic.attributes.status = status;
+      }
+
+      function buildTableRow(parameterName, parameterValue) {
+        var tr = document.createElement('tr');
+        var td1 = document.createElement('td');
+        tr.appendChild(td1);
+        var text1 = document.createTextNode(parameterName);
+        td1.appendChild(text1);
+        var td2 = document.createElement('td');
+        tr.appendChild(td2);
+        var text2 = document.createTextNode(parameterValue);
+        td2.appendChild(text2);
+        return tr;
+      }
+
+      function buildCommandsRow(trainId, status) {
+        if (trainId == 0) {
+          console.log("In buildCommandsRow for trainId 0, status is " + status);
+        }
+        var tr = document.createElement('tr');
+        var td1 = document.createElement('td');
+        tr.appendChild(td1);
+        var text = document.createTextNode('Commands:');
+        td1.appendChild(text);
+        var td2 = document.createElement('td');
+        tr.appendChild(td2);
+        if (status == 'stopped') {
+            var startButton = document.createElement('input');
+            startButton.type = 'button';
+            startButton.value = "Start";
+            startButton.className = "StartButton";
+            startButton.onclick = function() {publishStartCommand(trainId)};
+            td2.appendChild(startButton);
+        } else if (status == 'moving') {
+            var stopButton = document.createElement('input');
+            stopButton.type = 'button';
+            stopButton.value = "Stop";
+            stopButton.className = "StopButton";
+            stopButton.onclick = function() {publishStopCommand(trainId)};
+            td2.appendChild(stopButton);
+        }
+        return tr;
+      }
+
+      function buildPopupContent(trainId,
+                                 latitude,
+                                 longitude,
+                                 speed,
+                                 status,
+                                 temperature,
+                                 weight,
+                                 light,
+                                 distance) {
+        var table = document.createElement('table');
+        var tr = buildTableRow('latitude', latitude);
+        table.appendChild(tr);
+        tr = buildTableRow('longitude', longitude);
+        table.appendChild(tr);
+        tr = buildTableRow('speed', speed);
+        table.appendChild(tr);
+        tr = buildTableRow('temperature', temperature);
+        table.appendChild(tr);
+        tr = buildTableRow('weight', weight);
+        table.appendChild(tr);
+        tr = buildTableRow('light', light);
+        table.appendChild(tr);
+        tr = buildTableRow('distance', distance);
+        table.appendChild(tr);
+        tr = buildCommandsRow(trainId, status);
+        table.appendChild(tr);
+        return table;
+      }
+
+      function graphicClicked(evt) {
+        console.log("Entering graphciClicked()");
+        console.log("trainId is " + evt.graphic.attributes.trainId);
+        popup.setFeatures([evt.graphic]);
+        popup.setTitle("Train " + evt.graphic.attributes.trainId);
+        var popupContent = buildPopupContent(evt.graphic.attributes.trainId,
+                                             evt.graphic.attributes.latitude,
+                                             evt.graphic.attributes.longitude,
+                                             evt.graphic.attributes.speed,
+                                             evt.graphic.attributes.status,
+                                             evt.graphic.attributes.temperature,
+                                             evt.graphic.attributes.weight,
+                                             evt.graphic.attributes.light,
+                                             evt.graphic.attributes.distance);
+        popup.setContent(popupContent);
+        popup.show(evt.mapPoint);
+        console.log("Leaving graphciClicked()");
+      }
+
+      function mapLoaded(evt) {
+        evt.map.disableMapNavigation();
+        dojo.connect(map.graphics, "onClick", graphicClicked);
+
+        modelTrainPMS = new esri.symbol.PictureMarkerSymbol("images/model_train.png",24,24);
+        movingTrainPMS = new esri.symbol.PictureMarkerSymbol("images/moving_train.png",24,24);
+        stationaryTrainPMS = new esri.symbol.PictureMarkerSymbol("images/stationary_train.png",24,24);
+        stoppedTrainPMS = new esri.symbol.PictureMarkerSymbol("images/stopped_train.png",24,24);
+
+        connectToMQTT('#{mqttServer}', #{mqttPort});
+      }
+
+      function trainStatusChanged(trainId, status) {
+        result = false;
+
+        var graphic = trainToGraphicMap[trainId];
+        if (graphic.attributes.status != status) {
+          result = true;
+        }
+
+        return result;
+      }
+
+      function trainLocationChanged(trainId, location) {
+        result = false;
+
+        var graphic = trainToGraphicMap[trainId];
+        if (graphic.attributes.latitude != location.latitude ||
+            graphic.attributes.longitude != location.longitude) {
+          result = true;
+        }
+
+        return result;
+      }
+
+      function onMessageArrived(message) {
+        var topicParts = message.destinationName.split("/");
+        var trainId = topicParts[2];
+        var payload = JSON.parse(message.payloadString);
+        if (trainToGraphicMap.hasOwnProperty(trainId)) {
+          var graphic = trainToGraphicMap[trainId];
+          var point = graphic.geometry;
+          if (trainStatusChanged(trainId, payload.status)) {
+            changeStatus(trainId, payload.status);
+          }
+          if (trainLocationChanged(trainId, payload.location)) {
+            // Update graphic attributes with new location
+            // The status attribute is updated by the preceeding function
+            // The other attributes such as speed will have to be updated too
+            graphic.attributes.latitude = payload.location.latitude
+            graphic.attributes.longitude = payload.location.longitude
+            point.setLatitude(payload.location.latitude);
+            point.setLongitude(payload.location.longitude);
+            graphic.setGeometry(point); // This is necessary to move the Graphic
+          }
+          // Update Popup
+          if (popup.isShowing) {
+            console.log("Popup is showing");
+            if (popup.getSelectedFeature() === graphic) {
+              console.log("Popup is for this graphic");
+              // The following call to setFeatures() seems to be necessary
+              // to move the indication of the selected feature, but seems
+              // to have the side effect of clearing the title and the content,
+              // so they must be restored
+              popup.setFeatures([graphic]);
+              popup.setTitle("Train " + trainId);
+              var popupContent = buildPopupContent(graphic.attributes.trainId,
+                                                   graphic.attributes.latitude,
+                                                   graphic.attributes.longitude,
+                                                   graphic.attributes.speed,
+                                                   graphic.attributes.status,
+                                                   graphic.attributes.temperature,
+                                                   graphic.attributes.weight,
+                                                   graphic.attributes.light,
+                                                   graphic.attributes.distance);
+              console.log("Have built popupContent");
+              popup.setContent(popupContent);
+              popup.show(point);
+            }
+          }
+        } else {
+          var graphic = createGraphic(trainId, payload);
+          if (graphic != null) {
+            trainToGraphicMap[trainId] = graphic;
+            map.graphics.add(graphic);
+          }
+        }
+      }
+
+      function getRandomInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+      }
+
+      function connectToMQTT(host, port) {
+        try {
+          // Need to generate a unique clientId to allow multiple Web UIs
+          var clientId = "TDWUI_" + String(getRandomInt(1, 1000000));
+          mqttClient = new Messaging.Client(host,
+                                            port,
+                                            clientId);
+        } catch (error) {
+          alert("Error:"+error);
+        }
+
+        mqttClient.onConnectionLost = onConnectionLost;
+        mqttClient.onMessageArrived = onMessageArrived;
+        mqttClient.onMessageDelivered = onMessageDelivered;
+
+        var connectOptions = new Object();
+        connectOptions.cleanSession = true;
+        connectOptions.keepAliveInterval = 3600;
+        connectOptions.onSuccess = onConnectSuccess;
+        connectOptions.onFailure = onConnectFailure;
+
+        mqttClient.connect(connectOptions);
+      }
+    });
