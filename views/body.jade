@@ -247,7 +247,7 @@ body(class="claro")
         stationaryTrainPMS = new esri.symbol.PictureMarkerSymbol("images/stationary_train.png",24,24);
         stoppedTrainPMS = new esri.symbol.PictureMarkerSymbol("images/stopped_train.png",24,24);
 
-        connectToMQTT('#{mqttServer}', #{mqttPort});
+        connectToMQTT('#{mqttServer}', #{mqttPort}, #{useSSL});
       }
 
       function trainStatusChanged(trainId, status) {
@@ -331,7 +331,8 @@ body(class="claro")
         return Math.floor(Math.random() * (max - min + 1)) + min;
       }
 
-      function connectToMQTT(host, port) {
+      function connectToMQTT(host, port, useSSL) {
+        console.log("In connectTOMQTT(" + host + ", " + port + ", " + useSSL + ")");
         try {
           // Need to generate a unique clientId to allow multiple Web UIs
           var clientId = "TDWUI_" + String(getRandomInt(1, 1000000));
@@ -351,6 +352,11 @@ body(class="claro")
         connectOptions.keepAliveInterval = 3600;
         connectOptions.onSuccess = onConnectSuccess;
         connectOptions.onFailure = onConnectFailure;
+
+        if (useSSL == true) {
+          console.log("Setting useSSL");
+          connectOptions.useSSL = true;
+        }
 
         mqttClient.connect(connectOptions);
       }

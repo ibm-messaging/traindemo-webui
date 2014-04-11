@@ -22,6 +22,7 @@ var mapZoom = (process.env.mapZoom || 10);
 var BaseMap = String(process.env.BaseMap || 'topo');
 var mqttServer = String(process.env.mqttServer || '192.168.56.12');
 var mqttPort = (process.env.mqttPort || 1883);
+var useSSL = (process.env.useSSL || false);
 
 app.get('/', function(req, res){
 	res.render('index',
@@ -30,6 +31,7 @@ app.get('/', function(req, res){
                        'mapCenterLon': mapCenterLon,
                        'BaseMap': BaseMap,
                        'mapZoom': mapZoom,
+                       'useSSL': useSSL,
                        'mqttServer': mqttServer,
                        'mqttPort': mqttPort});
 });
