@@ -293,7 +293,12 @@ body(class="claro")
             point.setLongitude(payload.location.longitude);
             graphic.setGeometry(point); // This is necessary to move the Graphic
           }
-          // Update Popup
+          // Update Popup after updating sensor values and speed
+          graphic.attributes.temperature = payload.temperature;
+          graphic.attributes.weight = payload.weight;
+          graphic.attributes.light = payload.light;
+          graphic.attributes.distance = payload.distance;
+          graphic.attributes.speed = payload.speed;
           if (popup.isShowing) {
             console.log("Popup is showing");
             if (popup.getSelectedFeature() === graphic) {
