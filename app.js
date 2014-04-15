@@ -31,9 +31,9 @@ app.get('/', function(req, res){
                        'mapCenterLon': mapCenterLon,
                        'BaseMap': BaseMap,
                        'mapZoom': mapZoom,
-                       'useSSL': useSSL,
+                       'useSSL': req.query.useSSL || useSSL ,
                        'mqttServer': mqttServer,
-                       'mqttPort': mqttPort});
+                       'mqttPort': req.query.mqttPort || mqttPort});
 });
 
 var appInfo = JSON.parse(process.env.VCAP_APPLICATION || "{}");
