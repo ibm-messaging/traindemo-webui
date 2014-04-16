@@ -16,6 +16,13 @@ app.use(express.static(__dirname + '/public'));
 app.set('view engine', 'jade');
 app.set('views', __dirname + '/views');
 
+// Read specified config file, or defaultConfig.js if none specified
+var configFileName = (process.env.CONFIG_FILE_NAME || 'defaultConfig.js');
+var configFilePath = "./config/" + configFileName;
+console.log("Reading config file " + configFilePath);
+var config = require(configFilePath);
+console.log("config: " + JSON.stringify(config));
+
 var mapCenterLat = (process.env.mapCenterLat || 50.992717);
 var mapCenterLon = (process.env.mapCenterLon || -1.493298);
 var mapZoom = (process.env.mapZoom || 10);
@@ -27,13 +34,13 @@ var useSSL = (process.env.useSSL || false);
 app.get('/', function(req, res){
 	res.render('index',
                    {
-                       'mapCenterLat': mapCenterLat,
-                       'mapCenterLon': mapCenterLon,
-                       'BaseMap': BaseMap,
-                       'mapZoom': mapZoom,
-                       'useSSL': req.query.useSSL || useSSL ,
-                       'mqttServer': mqttServer,
-                       'mqttPort': req.query.mqttPort || mqttPort});
+                       'mapCenterLat': config.mapCenterLat,
+                       'mapCenterLon': config.mapCenterLon,
+                       'BaseMap': config.BaseMap,
+                       'mapZoom': config.mapZoom,
+                       'useSSL': req.query.useSSL || config.useSSL ,
+                       'mqttServer': config.mqttServer,
+                       'mqttPort': req.query.mqttPort || config.mqttPort});
 });
 
 var appInfo = JSON.parse(process.env.VCAP_APPLICATION || "{}");
