@@ -91,6 +91,7 @@ body(class="claro")
       function createGraphic(trainId, payload) {
         var graphic = null;
         var pms = null;
+        console.log("In createGraphic, payload is " + JSON.stringify(payload));
         var point = new esri.geometry.Point(payload.location.longitude,
                                             payload.location.latitude,
                                             new esri.SpatialReference({
@@ -221,7 +222,7 @@ body(class="claro")
 
       function graphicClicked(evt) {
         console.log("Entering graphciClicked()");
-        console.log("trainId is " + evt.graphic.attributes.trainId);
+        console.log("evt is " + JSON.stringify(evt));
         popup.setFeatures([evt.graphic]);
         popup.setTitle("Train " + evt.graphic.attributes.trainId);
         var popupContent = buildPopupContent(evt.graphic.attributes.trainId,
@@ -274,6 +275,7 @@ body(class="claro")
       }
 
       function onMessageArrived(message) {
+        console.log("In onMessageArrived, payload is " + message.payloadString);
         var topicParts = message.destinationName.split("/");
         var trainId = topicParts[2];
         var payload = JSON.parse(message.payloadString);
@@ -283,15 +285,20 @@ body(class="claro")
           if (trainStatusChanged(trainId, payload.status)) {
             changeStatus(trainId, payload.status);
           }
-          if (trainLocationChanged(trainId, payload.location)) {
-            // Update graphic attributes with new location
-            // The status attribute is updated by the preceeding function
-            // The other attributes such as speed will have to be updated too
-            graphic.attributes.latitude = payload.location.latitude
-            graphic.attributes.longitude = payload.location.longitude
-            point.setLatitude(payload.location.latitude);
-            point.setLongitude(payload.location.longitude);
-            graphic.setGeometry(point); // This is necessary to move the Graphic
+          // The following test is to protect against a raw model train message that is published to the augmented topic
+          if (payload.hasOwnProperty('location')) {
+            if (trainLocationChanged(trainId, payload.location)) {
+              // Update graphic attributes with new location
+              // The status attribute is updated by the preceeding function
+              // The other attributes such as speed will have to be updated too
+              graphic.attributes.latitude = payload.location.latitude
+              graphic.attributes.longitude = payload.location.longitude
+              point.setLatitude(payload.location.latitude);
+              point.setLongitude(payload.location.longitude);
+              graphic.setGeometry(point); // This is necessary to move the Graphic
+            }
+          } else {
+            console.log("Have not got a location");
           }
           // Update Popup after updating sensor values and speed
           graphic.attributes.temperature = payload.temperature;
@@ -324,10 +331,15 @@ body(class="claro")
             }
           }
         } else {
-          var graphic = createGraphic(trainId, payload);
-          if (graphic != null) {
-            trainToGraphicMap[trainId] = graphic;
-            map.graphics.add(graphic);
+          // The following test is in case we get a model train message instead of an augmented message
+          if (payload.hasOwnProperty('location')) {
+            var graphic = createGraphic(trainId, payload);
+            if (graphic != null) {
+              trainToGraphicMap[trainId] = graphic;
+              map.graphics.add(graphic);
+            }
+          } else {
+            console.log("Have not got a location");
           }
         }
       }
