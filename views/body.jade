@@ -19,7 +19,6 @@ body(class="claro")
     // The following function has to be global so it can be referenced in
     // the Popup content.
     function publishStartCommand(trainId) {
-      console.log("In publishStartCommand(" + trainId + ")");
       var topic = "TrainDemo/train/" + trainId + "/command";
       startMessage.destinationName = topic;
       mqttClient.send(startMessage);
@@ -28,7 +27,6 @@ body(class="claro")
     // The following function has to be global so it can be referenced in
     // the Popup content.
     function publishStopCommand(trainId) {
-      console.log("In publishStopCommand(" + trainId + ")");
       var topic = "TrainDemo/train/" + trainId + "/command";
       stopMessage.destinationName = topic;
       mqttClient.send(stopMessage);
@@ -54,7 +52,6 @@ body(class="claro")
     }
 
       function onConnectSuccess() {
-          console.log("In onConnectSuccess()");
           var subscribeOptions = {};
           mqttClient.subscribe("TrainDemo/train/+/telemetry", subscribeOptions);
       }
@@ -70,7 +67,6 @@ body(class="claro")
       var popupSrcNodeRef = dojo.create("div");
       var popup = new Popup(popupOptions, popupSrcNodeRef);
       var basemap = '#{BaseMap}';
-      console.log("About to create Map with basemap " + basemap);
       map = new Map("mapDiv", {
         center: [ #{mapCenterLon}, #{mapCenterLat}],
         zoom: #{mapZoom},
@@ -91,7 +87,6 @@ body(class="claro")
       function createGraphic(trainId, payload) {
         var graphic = null;
         var pms = null;
-        console.log("In createGraphic, payload is " + JSON.stringify(payload));
         var point = new esri.geometry.Point(payload.location.longitude,
                                             payload.location.latitude,
                                             new esri.SpatialReference({
@@ -221,8 +216,6 @@ body(class="claro")
       }
 
       function graphicClicked(evt) {
-        console.log("Entering graphciClicked()");
-        console.log("evt is " + JSON.stringify(evt));
         popup.setFeatures([evt.graphic]);
         popup.setTitle("Train " + evt.graphic.attributes.trainId);
         var popupContent = buildPopupContent(evt.graphic.attributes.trainId,
@@ -236,7 +229,6 @@ body(class="claro")
                                              evt.graphic.attributes.distance);
         popup.setContent(popupContent);
         popup.show(evt.mapPoint);
-        console.log("Leaving graphciClicked()");
       }
 
       function mapLoaded(evt) {
@@ -275,7 +267,6 @@ body(class="claro")
       }
 
       function onMessageArrived(message) {
-        console.log("In onMessageArrived, payload is " + message.payloadString);
         var topicParts = message.destinationName.split("/");
         var trainId = topicParts[2];
         var payload = JSON.parse(message.payloadString);
@@ -307,9 +298,7 @@ body(class="claro")
           graphic.attributes.distance = payload.distance;
           graphic.attributes.speed = payload.speed;
           if (popup.isShowing) {
-            console.log("Popup is showing");
             if (popup.getSelectedFeature() === graphic) {
-              console.log("Popup is for this graphic");
               // The following call to setFeatures() seems to be necessary
               // to move the indication of the selected feature, but seems
               // to have the side effect of clearing the title and the content,
@@ -325,7 +314,6 @@ body(class="claro")
                                                    graphic.attributes.weight,
                                                    graphic.attributes.light,
                                                    graphic.attributes.distance);
-              console.log("Have built popupContent");
               popup.setContent(popupContent);
               popup.show(point);
             }
