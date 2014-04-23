@@ -23,14 +23,6 @@ console.log("Reading config file " + configFilePath);
 var config = require(configFilePath);
 console.log("config: " + JSON.stringify(config));
 
-var mapCenterLat = (process.env.mapCenterLat || 50.992717);
-var mapCenterLon = (process.env.mapCenterLon || -1.493298);
-var mapZoom = (process.env.mapZoom || 10);
-var BaseMap = String(process.env.BaseMap || 'topo');
-var mqttServer = String(process.env.mqttServer || '192.168.56.12');
-var mqttPort = (process.env.mqttPort || 1883);
-var useSSL = (process.env.useSSL || false);
-
 app.get('/', function(req, res){
 	res.render('index',
                    {
